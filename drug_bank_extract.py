@@ -105,7 +105,7 @@ print(json_string)
 potential_indications_id_to_name = {}
 for key, value in res.items():
     for v in value:
-        if v[1]['preferred_category'] == 'biolink:Disease':
+        if v[1]['preferred_category'] in {'biolink:Disease', 'biolink:PhenotypicFeature', 'biolink:DiseaseOrPhenotypicFeature'}:
             if v[0] not in potential_indications_id_to_name:
                 potential_indications_id_to_name[v[0]] = key
             elif v[0] in potential_indications_id_to_name and len(key) > len(potential_indications_id_to_name[v[0]]):
