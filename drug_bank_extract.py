@@ -2,11 +2,7 @@ import os
 import xmltodict
 from node_synonymizer import NodeSynonymizer
 
-# NOTE: 'targets' also includes some amino acid sequences, so might need to dig into the targets subssubsections
-# to see how to avoid those.
-
-# Note: this assumes everything is text, but some fields are identifiers or references and these will need to be
-# handled differently
+DB_PREFIX = 'DRUGBANK:'
 
 # Directly use the node synonymizer
 synonymizer = NodeSynonymizer()
@@ -72,3 +68,21 @@ print("Number of drugs with info:", len(drug_dict))
 
 # Let's start the dictionary that will be keyed by the KG2 drug identifiers and will have the drug info as values
 kg2_drug_info = {}
+for drug in drug_dict.keys():
+    query_CURIE = DB_PREFIX + drug
+    norm_results = synonymizer.get_canonical_curies(query_CURIE)
+    if norm_results[query_CURIE]:
+        identifier = norm_results[query_CURIE]['preferred_curie']
+        name = norm_results[query_CURIE]['preferred_name']
+        category = norm_results[query_CURIE]['preferred_category']
+        if identifier:
+            kg2_drug_info[identifier] = {}
+            kg2_drug_info[identifier]['KG2_ID'] = identifier
+            if name:
+                kg2_drug_info[identifier]['name'] = get_preferred_name(identifier)
+            if category:
+                kg2_drug_info[identifier]['category'] = category
+            kg2_drug_info[identifier]["drug_bank_id"] = drug
+
+# So now we have the KG2 identifiers for the drugs, as well as the category, name, and drugbank id
+# Now, I would like to NER the indications to add to a "indication" field in the kg2_drug_info dictionary
