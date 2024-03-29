@@ -1,11 +1,20 @@
 import os
 import xmltodict
+from node_synonymizer import NodeSynonymizer
 
 # NOTE: 'targets' also includes some amino acid sequences, so might need to dig into the targets subssubsections
 # to see how to avoid those.
 
 # Note: this assumes everything is text, but some fields are identifiers or references and these will need to be
 # handled differently
+
+# Directly use the node synonymizer
+synonymizer = NodeSynonymizer()
+
+def get_preferred_name(curie):
+    results = synonymizer.get_canonical_curies(curies=curie)
+    return results[curie]['preferred_name']
+
 def extract_text(value):
     """
     Traverses a nested dictionary/list-of*-lists and extracts all the text values
@@ -60,3 +69,6 @@ for drug in drugs:
             drug_dict[primary_id] = drug_info
 
 print("Number of drugs with info:", len(drug_dict))
+
+# Let's start the dictionary that will be keyed by the KG2 drug identifiers and will have the drug info as values
+kg2_drug_info = {}
