@@ -14,4 +14,8 @@ ETL of DrugBank to recognize KG2 concepts in DrugBank entries for use as trainin
     ```
     Note that this path is via [this line in config_dbs.json](https://github.
     com/RTXteam/RTX/blob/master/code/config_dbs.json#L3C28-L3C111) in case it gets updated
-   
+1. Download ScispaCy training data
+Please download the `en_core_sci_lg` model from [here](https://allenai.github.io/scispacy/). In short, this can be accomplished with
+```bash
+pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_lg-0.5.3.tar.gz
+```

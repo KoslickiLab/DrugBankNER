@@ -14,9 +14,9 @@ import pandas as pd
 
 class NodeSynonymizer:
 
-    def __init__(self):
-        self.database_name = "node_synonymizer_v1.0_KG2.8.4.sqlite"
-        synonymizer_dir = "./data"
+    def __init__(self, synonymizer_dir: str = "./data", synonymizer_dbname: str = "node_synonymizer_v1.0_KG2.8.4.sqlite"):
+        self.database_name = synonymizer_dbname
+        synonymizer_dir = os.path.abspath(synonymizer_dir)
         self.database_path = f"{synonymizer_dir}/{self.database_name}"
         self.placeholder_lookup_values_str = "**LOOKUP_VALUES_GO_HERE**"
         self.unnecessary_chars_map = {ord(char): None for char in string.punctuation + string.whitespace}

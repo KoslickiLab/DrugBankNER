@@ -1,11 +1,18 @@
 import os
 import xmltodict
 from node_synonymizer import NodeSynonymizer
+import NER
+import json
+
 
 DB_PREFIX = 'DRUGBANK:'
 
 # Directly use the node synonymizer
-synonymizer = NodeSynonymizer()
+synonymizer = NodeSynonymizer("./data", "node_synonymizer_v1.0_KG2.8.4.sqlite")
+
+# Chunyu's NER
+trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_synonymizer_v1.0_KG2.8.4.sqlite',
+                linker_name=['umls', 'mesh'])
 
 def get_preferred_name(curie):
     results = synonymizer.get_canonical_curies(curies=curie)
@@ -86,3 +93,22 @@ for drug in drug_dict.keys():
 
 # So now we have the KG2 identifiers for the drugs, as well as the category, name, and drugbank id
 # Now, I would like to NER the indications to add to a "indication" field in the kg2_drug_info dictionary
+
+# test out the NER
+indication = drug_dict['DB00001']['indication']
+res = trapi_ner.get_kg2_match(indication, remove_mark=True)
+json_string = json.dumps(res, indent=4)
+print(json_string)
+
+# For each entry in res, return the key and preferred_name of those entries where the preferred_category is
+# biolink:Disease
+potential_indications_id_to_name = {}
+for key, value in res.items():
+    for v in value:
+        if v[1]['preferred_category'] == 'biolink:Disease':
+            if v[0] not in potential_indications_id_to_name:
+                potential_indications_id_to_name[v[0]] = key
+            elif v[0] in potential_indications_id_to_name and len(key) > len(potential_indications_id_to_name[v[0]]):
+                potential_indications_id_to_name[v[0]] = key
+print(potential_indications_id_to_name)
+# TODO I would then add this back into the kg2_drug_info dict, and do this for all drugs with indications
