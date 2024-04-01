@@ -3,9 +3,25 @@ import xmltodict
 from node_synonymizer import NodeSynonymizer
 import NER
 import json
+import spacy
+import scispacy
 
 
 DB_PREFIX = 'DRUGBANK:'
+MECHANISTIC_CATEGORIES = {"biolink:BiologicalProcess", "biolink:BiologicalProcessOrActivity",
+"biolink:Cell", "biolink:CellularComponent", "biolink:Drug",
+"biolink:Disease", "biolink:DiseaseOrPhenotypicFeature",
+"biolink:Gene", "biolink:GeneProduct", "biolink:GeneFamily",
+"biolink:GeneGroupingMixin", "biolink:GeneOrGeneProduct",
+"biolink:MolecularActivity", "biolink:NoncodingRNAProduct",
+"biolink:PathologicalProcess", "biolink:PhenotypicFeature",
+"biolink:Pathway", "biolink:PhenotypicFeature", "biolink:Protein",
+"biolink:ProteinDomain", "biolink:ProteinFamily",
+"biolink:PhysiologicalProcess", "biolink:RNAProduct",
+"biolink:SmallMolecule", "biolink:Transcript"}
+
+# for light NLP stuff
+nlp = spacy.load("en_core_sci_lg")
 
 # Directly use the node synonymizer
 synonymizer = NodeSynonymizer("./data", "node_synonymizer_v1.0_KG2.8.4.sqlite")
@@ -13,6 +29,47 @@ synonymizer = NodeSynonymizer("./data", "node_synonymizer_v1.0_KG2.8.4.sqlite")
 # Chunyu's NER
 trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_synonymizer_v1.0_KG2.8.4.sqlite',
                 linker_name=['umls', 'mesh'])
+
+
+def text_to_kg2_mechanistic_nodes(text):
+    potential_mechanistic_matched_nodes = {}
+    # split the text into sentences
+    #doc = nlp(text)  # turns out spacy is confused by things like: .[reference]
+    # for sentence in doc.sents:
+    sentences = text.split('.')
+    for sentence in sentences:
+        res = trapi_ner.get_kg2_match(sentence, remove_mark=True)
+        # For each entry in res, return the key and preferred_name of those entries where the preferred_category is
+        # in MECHANISTIC_CATEGORIES
+        for key, value in res.items():  # keys are plain text names, values are lists of tuples
+            for v in value:  # v[0] is the KG2 identifier, v[1] is the node info in the form of a dict
+                if v[1]['preferred_category'] in MECHANISTIC_CATEGORIES:
+                    if v[0] not in potential_mechanistic_matched_nodes:
+                        potential_mechanistic_matched_nodes[v[0]] = {'name': key, 'category': v[1]['preferred_category']}
+                    # replace name with longer name
+                    elif v[0] in potential_mechanistic_matched_nodes and len(key) > len(
+                            potential_mechanistic_matched_nodes[v[0]]['name']):
+                        potential_mechanistic_matched_nodes[v[0]]['name'] = key
+    return potential_mechanistic_matched_nodes
+
+def drug_bank_id_to_kg2_indication(drug_bank_id, drug_dict):
+    indication = drug_dict[drug_bank_id]['indication']
+    res = trapi_ner.get_kg2_match(indication, remove_mark=True)
+    # For each entry in res, return the key and preferred_name of those entries where the preferred_category is
+    # biolink:Disease, phenotypicFeature, or DiseaseOrPhenotypicFeature
+    potential_indications_id_to_name = {}
+    for key, value in res.items():
+        for v in value:
+            if v[1]['preferred_category'] in {'biolink:Disease', 'biolink:PhenotypicFeature',
+                                              'biolink:DiseaseOrPhenotypicFeature'}:
+                if v[0] not in potential_indications_id_to_name:
+                    potential_indications_id_to_name[v[0]] = key
+                # replace name with longer name
+                elif v[0] in potential_indications_id_to_name and len(key) > len(
+                        potential_indications_id_to_name[v[0]]):
+                    potential_indications_id_to_name[v[0]] = key
+    return potential_indications_id_to_name
+
 
 def get_preferred_name(curie):
     results = synonymizer.get_canonical_curies(curies=curie)
@@ -92,23 +149,36 @@ for drug in drug_dict.keys():
             kg2_drug_info[identifier]["drug_bank_id"] = drug
 
 # So now we have the KG2 identifiers for the drugs, as well as the category, name, and drugbank id
-# Now, I would like to NER the indications to add to a "indication" field in the kg2_drug_info dictionary
+# Now, I would like to NER the indications to add to an "indication" field in the kg2_drug_info dictionary.
+# While I am at it, also add the intermediate nodes
+for kg2_drug in kg2_drug_info.keys():
+    drug_bank_id = kg2_drug_info[kg2_drug]["drug_bank_id"]
+    # NER and KG2 align the indications
+    kg2_drug_info[kg2_drug]["indications"] = drug_bank_id_to_kg2_indication(drug_bank_id, drug_dict)
+    # NER and KG2 align the mechanistic intermediate nodes
+    all_intermediate_text = ""
+    for field in drug_dict[drug_bank_id].keys():
+        if field != "indication":
+            all_intermediate_text += drug_dict[drug_bank_id][field]
+    # then do the NER
+    kg2_drug_info[kg2_drug]["mechanistic_intermediate_nodes"] = text_to_kg2_mechanistic_nodes(all_intermediate_text)
 
-# test out the NER
-indication = drug_dict['DB00001']['indication']
-res = trapi_ner.get_kg2_match(indication, remove_mark=True)
-json_string = json.dumps(res, indent=4)
-print(json_string)
 
-# For each entry in res, return the key and preferred_name of those entries where the preferred_category is
-# biolink:Disease
-potential_indications_id_to_name = {}
-for key, value in res.items():
-    for v in value:
-        if v[1]['preferred_category'] in {'biolink:Disease', 'biolink:PhenotypicFeature', 'biolink:DiseaseOrPhenotypicFeature'}:
-            if v[0] not in potential_indications_id_to_name:
-                potential_indications_id_to_name[v[0]] = key
-            elif v[0] in potential_indications_id_to_name and len(key) > len(potential_indications_id_to_name[v[0]]):
-                potential_indications_id_to_name[v[0]] = key
-print(potential_indications_id_to_name)
-# TODO I would then add this back into the kg2_drug_info dict, and do this for all drugs with indications
+
+#######
+# Just spot checking the results
+res = kg2_drug_info['PUBCHEM.COMPOUND:118856773']
+def extract_unique_names(obj, names_set):
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if key == 'name':
+                names_set.add(value)
+            else:
+                extract_unique_names(value, names_set)
+    elif isinstance(obj, list):
+        for item in obj:
+            extract_unique_names(item, names_set)
+unique_names = set()
+extract_unique_names(res, unique_names)
+for name in unique_names:
+    print(name)
