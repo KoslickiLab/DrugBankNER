@@ -16,7 +16,8 @@ class TRAPI_NER:
                  spacy_model: str = 'en_core_sci_lg',
                  linker_name: Union[str, List] = 'umls',
                  threshold: float = 0.99,
-                 num_neighbors: int = 5):
+                 num_neighbors: int = 1,
+                 max_entities_per_mention: int = 1):
         # Setup logger
         self.logger = get_logger()
 
@@ -32,7 +33,8 @@ class TRAPI_NER:
             linker_name = [linker_name]
         self.logger.info("Input linker_name: {}".format(linker_name))
 
-        intersect_link_names = list(set([x.lower() for x in linker_name]).intersection(set(['umls', 'mesh'])))
+        intersect_link_names = list(set([x.lower() for x in linker_name]).intersection(set(['umls', 'mesh', 'go',
+                                                                                            'hpo', 'rxnorm'])))
         if len(intersect_link_names) == 0:
             raise ValueError("linker_name must be one of: umls, mesh or both of them")
         self.available_linker_names = intersect_link_names
@@ -46,7 +48,7 @@ class TRAPI_NER:
             nlp.add_pipe("abbreviation_detector")
             nlp.add_pipe("scispacy_linker",
                          config={"resolve_abbreviations": True, "linker_name": x, "threshold": threshold,
-                                 "k": num_neighbors})
+                                 "k": num_neighbors, "max_entities_per_mention": max_entities_per_mention})
 
     def _get_preferred_curies_info(self, query: Union[str, List]) -> dict:
         """
