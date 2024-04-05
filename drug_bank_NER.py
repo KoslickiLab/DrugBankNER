@@ -165,84 +165,83 @@ def process_drug(drug):
 
     return drug_data
 
+def main():
+    # After running download_data.sh, the data will be in the data/ directory
+    # convert the xml to dicts
+    with open('./data/full_database.xml', 'r', encoding='utf-8') as fd:
+        doc = xmltodict.parse(fd.read())
 
-# After running download_data.sh, the data will be in the data/ directory
-# convert the xml to dicts
-with open('./data/full_database.xml', 'r', encoding='utf-8') as fd:
-    doc = xmltodict.parse(fd.read())
+    drugs = doc['drugbank']['drug']
+    drug_dict = {}
 
-drugs = doc['drugbank']['drug']
-drug_dict = {}
+    # loop over all the drugs, extract the relevant information and store it in a dictionary
+    for drug in drugs:
+        # This handles the case where there are multiple drugbank-ids and chooses the primary one
+        drug_ids = drug['drugbank-id']
+        try:
+            primary_id = [d['#text'] for d in drug_ids if isinstance(d, dict) and d.get('@primary', '') == 'true'][0]
+        except IndexError:
+            primary_id = drug_ids['#text'] if isinstance(drug_ids, dict) and drug_ids.get('@primary', '') == 'true' else ''
+        if primary_id:
+            drug_info = process_drug(drug)
+            # check if some field is not empty
+            if any(drug_info.values()):
+                drug_dict[primary_id] = drug_info
 
-# loop over all the drugs, extract the relevant information and store it in a dictionary
-for drug in drugs:
-    # This handles the case where there are multiple drugbank-ids and chooses the primary one
-    drug_ids = drug['drugbank-id']
-    try:
-        primary_id = [d['#text'] for d in drug_ids if isinstance(d, dict) and d.get('@primary', '') == 'true'][0]
-    except IndexError:
-        primary_id = drug_ids['#text'] if isinstance(drug_ids, dict) and drug_ids.get('@primary', '') == 'true' else ''
-    if primary_id:
-        drug_info = process_drug(drug)
-        # check if some field is not empty
-        if any(drug_info.values()):
-            drug_dict[primary_id] = drug_info
+    print("Number of drugs with info:", len(drug_dict))
 
-print("Number of drugs with info:", len(drug_dict))
+    # Let's start the dictionary that will be keyed by the KG2 drug identifiers and will have the drug info as values
+    kg2_drug_info = {}
+    i = 0
+    max_i = len(drug_dict.keys())
+    for drug in drug_dict.keys():
+        if i % 100 == 0:
+            print(f"Processing drug {i} of {max_i}")
+        i += 1
+        query_CURIE = DB_PREFIX + drug
+        norm_results = synonymizer.get_canonical_curies(query_CURIE)
+        if norm_results[query_CURIE]:
+            identifier = norm_results[query_CURIE]['preferred_curie']
+            name = norm_results[query_CURIE]['preferred_name']
+            category = norm_results[query_CURIE]['preferred_category']
+            if identifier:
+                kg2_drug_info[identifier] = {}
+                kg2_drug_info[identifier]['KG2_ID'] = identifier
+                if name:
+                    kg2_drug_info[identifier]['name'] = get_preferred_name(identifier)
+                if category:
+                    kg2_drug_info[identifier]['category'] = category
+                kg2_drug_info[identifier]["drug_bank_id"] = drug
 
-# Let's start the dictionary that will be keyed by the KG2 drug identifiers and will have the drug info as values
-kg2_drug_info = {}
-i = 0
-max_i = len(drug_dict.keys())
-for drug in drug_dict.keys():
-    if i % 100 == 0:
+    # So now we have the KG2 identifiers for the drugs, as well as the category, name, and drugbank id
+    # Now, I would like to NER the indications to add to an "indication" field in the kg2_drug_info dictionary.
+    # While I am at it, also add the intermediate nodes
+    i = 0
+    max_i = len(kg2_drug_info.keys())
+    for kg2_drug in kg2_drug_info.keys():
+        #if i % 100 == 0:
         print(f"Processing drug {i} of {max_i}")
-    i += 1
-    query_CURIE = DB_PREFIX + drug
-    norm_results = synonymizer.get_canonical_curies(query_CURIE)
-    if norm_results[query_CURIE]:
-        identifier = norm_results[query_CURIE]['preferred_curie']
-        name = norm_results[query_CURIE]['preferred_name']
-        category = norm_results[query_CURIE]['preferred_category']
-        if identifier:
-            kg2_drug_info[identifier] = {}
-            kg2_drug_info[identifier]['KG2_ID'] = identifier
-            if name:
-                kg2_drug_info[identifier]['name'] = get_preferred_name(identifier)
-            if category:
-                kg2_drug_info[identifier]['category'] = category
-            kg2_drug_info[identifier]["drug_bank_id"] = drug
-
-# So now we have the KG2 identifiers for the drugs, as well as the category, name, and drugbank id
-# Now, I would like to NER the indications to add to an "indication" field in the kg2_drug_info dictionary.
-# While I am at it, also add the intermediate nodes
-i = 0
-max_i = len(kg2_drug_info.keys())
-for kg2_drug in kg2_drug_info.keys():
-    #if i % 100 == 0:
-    print(f"Processing drug {i} of {max_i}")
-    i += 1
-    drug_bank_id = kg2_drug_info[kg2_drug]["drug_bank_id"]
-    # NER and KG2 align the indications
-    kg2_drug_info[kg2_drug]["indications"] = drug_bank_id_to_kg2_indication(drug_bank_id, drug_dict)
-    # NER and KG2 align the mechanistic intermediate nodes
-    all_intermediate_text = ""
-    for field in drug_dict[drug_bank_id].keys():
-        if field != "indication":
-            all_intermediate_text += drug_dict[drug_bank_id][field]
-    # then do the NER
-    kg2_drug_info[kg2_drug]["mechanistic_intermediate_nodes"] = text_to_kg2_mechanistic_nodes(all_intermediate_text)
+        i += 1
+        drug_bank_id = kg2_drug_info[kg2_drug]["drug_bank_id"]
+        # NER and KG2 align the indications
+        kg2_drug_info[kg2_drug]["indications"] = drug_bank_id_to_kg2_indication(drug_bank_id, drug_dict)
+        # NER and KG2 align the mechanistic intermediate nodes
+        all_intermediate_text = ""
+        for field in drug_dict[drug_bank_id].keys():
+            if field != "indication":
+                all_intermediate_text += drug_dict[drug_bank_id][field]
+        # then do the NER
+        kg2_drug_info[kg2_drug]["mechanistic_intermediate_nodes"] = text_to_kg2_mechanistic_nodes(all_intermediate_text)
 
 
 
-# Now, let's write this to a JSON file
-with open('kg2_drug_info1.json', 'w') as f:
-    json.dump(kg2_drug_info, f, indent=4)
+    # Now, let's write this to a JSON file
+    with open('kg2_drug_info1.json', 'w') as f:
+        json.dump(kg2_drug_info, f, indent=4)
 
-# also save as a pickle file for fast loading
-with open('kg2_drug_info1.pkl', 'wb') as f:
-    pickle.dump(kg2_drug_info, f)
+    # also save as a pickle file for fast loading
+    with open('kg2_drug_info1.pkl', 'wb') as f:
+        pickle.dump(kg2_drug_info, f)
 
-
-# Next, I want to grab all possible identifiers contained in the drugbank data, including in the fields I omitted
-# from the NLP NER part.
+if __name__ == "__main__":
+    main()
