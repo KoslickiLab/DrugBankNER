@@ -9,24 +9,11 @@ import sys
 import pickle
 import concurrent.futures
 from multiprocessing import Pool
+from utils import extract_text, process_drug, get_xml_data, process_drugbank_data
+from CONSTANTS import MECHANISTIC_CATEGORIES, DB_PREFIX, MOSTLY_TEXT_FIELDS
 
 # TODO: note! The pathways are all associated with identifiers, so probably only need to align them with KG2,
 #  no need to perform NER on them. Same with targets and transporters
-
-
-DB_PREFIX = 'DRUGBANK:'
-MECHANISTIC_CATEGORIES = {"biolink:BiologicalProcess", "biolink:BiologicalProcessOrActivity",
-"biolink:Cell", "biolink:CellularComponent", "biolink:Drug",
-"biolink:Disease", "biolink:DiseaseOrPhenotypicFeature",
-"biolink:Gene", "biolink:GeneProduct", "biolink:GeneFamily",
-"biolink:GeneGroupingMixin", "biolink:GeneOrGeneProduct",
-"biolink:MolecularActivity", "biolink:NoncodingRNAProduct",
-"biolink:PathologicalProcess", "biolink:PhenotypicFeature",
-"biolink:Pathway", "biolink:PhenotypicFeature", "biolink:Protein",
-"biolink:ProteinDomain", "biolink:ProteinFamily",
-"biolink:PhysiologicalProcess", "biolink:RNAProduct",
-"biolink:SmallMolecule", "biolink:Transcript"}
-
 
 spacy.require_gpu()
 
@@ -70,8 +57,6 @@ def delete_long_tokens(text, max_length=100):
 def text_to_kg2_mechanistic_nodes(text):
     potential_mechanistic_matched_nodes = {}
     # split the text into sentences
-    #doc = nlp(text)  # turns out spacy is confused by things like: .[reference]
-    # for sentence in doc.sents:
     sentences = text.split('.')
     for sentence in sentences:
         # omit very long sequences and very short ones
@@ -85,18 +70,6 @@ def text_to_kg2_mechanistic_nodes(text):
                 res = trapi_ner.get_kg2_match(sentence, remove_mark=True)
             except RuntimeError:
                 continue
-            # For each entry in res, return the key and preferred_name of those entries where the preferred_category is
-            # in MECHANISTIC_CATEGORIES
-            # instead of if there is a single entry whose category is mechanistic, let's try adding only
-            # those whose _all_ entries are mechanistic. Not a lot of matches, and still some generic ones (eg.
-            # secreted)
-            #all_mechanistic = True
-            #for key, value in res.items():
-            #    for v in value:
-            #        if v[1]['preferred_category'] not in MECHANISTIC_CATEGORIES:
-            #            all_mechanistic = False
-            #            break
-            #if all_mechanistic:
             for key, value in res.items():  # keys are plain text names, values are lists of tuples
                 for v in value:  # v[0] is the KG2 identifier, v[1] is the node info in the form of a dict
                     if v[1]['preferred_category'] in MECHANISTIC_CATEGORIES:
@@ -133,65 +106,17 @@ def get_preferred_name(curie):
     return results[curie]['preferred_name']
 
 
-def extract_text(value):
-    """
-    Traverses a nested dictionary/list-of*-lists and extracts all the text values
-    :param value:
-    :return: big-ol-string
-    """
-    if isinstance(value, list):
-        res = ' '.join(extract_text(v) for v in value)
-    elif isinstance(value, dict):
-        res = ' '.join(extract_text(v) for k, v in value.items() if not k.startswith('@'))
-    else:
-        res = str(value)
-    if res != 'None':
-        return res
-    else:
-        return ''
-
-
-def process_drug(drug):
-    #fields = ['description', 'indication', 'pharmacodynamics', 'mechanism-of-action',
-    #          'metabolism', 'protein-binding', 'pathways', 'reactions', 'targets',
-    #          'enzymes', 'carriers', 'transporters']  # From what I can see, these are the most relevant to us
-    fields = ['description', 'indication', 'pharmacodynamics', 'mechanism-of-action',
-              'metabolism', 'protein-binding', 'reactions',
-              'enzymes', 'carriers', 'transporters']
-    drug_data = {}
-    for field in fields:
-        value = drug.get(field, '')
-        drug_data[field] = extract_text(value)
-
-    return drug_data
-
 def main():
     # After running download_data.sh, the data will be in the data/ directory
     # convert the xml to dicts
-    with open('./data/full_database.xml', 'r', encoding='utf-8') as fd:
-        doc = xmltodict.parse(fd.read())
-
-    drugs = doc['drugbank']['drug']
-    drug_dict = {}
-
-    # loop over all the drugs, extract the relevant information and store it in a dictionary
-    for drug in drugs:
-        # This handles the case where there are multiple drugbank-ids and chooses the primary one
-        drug_ids = drug['drugbank-id']
-        try:
-            primary_id = [d['#text'] for d in drug_ids if isinstance(d, dict) and d.get('@primary', '') == 'true'][0]
-        except IndexError:
-            primary_id = drug_ids['#text'] if isinstance(drug_ids, dict) and drug_ids.get('@primary', '') == 'true' else ''
-        if primary_id:
-            drug_info = process_drug(drug)
-            # check if some field is not empty
-            if any(drug_info.values()):
-                drug_dict[primary_id] = drug_info
+    doc = get_xml_data()
+    drug_dict = process_drugbank_data(doc, MOSTLY_TEXT_FIELDS)
 
     print("Number of drugs with info:", len(drug_dict))
 
     # Let's start the dictionary that will be keyed by the KG2 drug identifiers and will have the drug info as values
     kg2_drug_info = {}
+    # convert all the drugbank IDs to KG2 IDs
     i = 0
     max_i = len(drug_dict.keys())
     for drug in drug_dict.keys():
@@ -215,7 +140,7 @@ def main():
 
     # So now we have the KG2 identifiers for the drugs, as well as the category, name, and drugbank id
     # Now, I would like to NER the indications to add to an "indication" field in the kg2_drug_info dictionary.
-    # While I am at it, also add the intermediate nodes
+    # While I am at it, also add the intermediate mechanistic nodes to the kg2_drug_info dictionary
     i = 0
     max_i = len(kg2_drug_info.keys())
     for kg2_drug in kg2_drug_info.keys():
@@ -236,12 +161,13 @@ def main():
 
 
     # Now, let's write this to a JSON file
-    with open('kg2_drug_info1.json', 'w') as f:
+    with open('./data/kg2_drug_info.json', 'w') as f:
         json.dump(kg2_drug_info, f, indent=4)
 
     # also save as a pickle file for fast loading
-    with open('kg2_drug_info1.pkl', 'wb') as f:
+    with open('./data/kg2_drug_info.pkl', 'wb') as f:
         pickle.dump(kg2_drug_info, f)
+
 
 if __name__ == "__main__":
     main()
