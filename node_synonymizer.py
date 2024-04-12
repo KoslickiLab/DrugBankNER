@@ -8,6 +8,7 @@ import string
 import sys
 from collections import defaultdict
 from typing import Optional, Union, List, Set, Dict, Tuple
+from CONSTANTS import ALL_PREFIXES
 
 import pandas as pd
 
@@ -35,6 +36,21 @@ class NodeSynonymizer:
             self.db_connection.close()
 
     # --------------------------------------- EXTERNAL MAIN METHODS ----------------------------------------------- #
+
+    def get_canonical_curies_from_suffix(self, suffix: str) -> dict:
+        if ':' in suffix:
+            # If the suffix already contains a prefix, handle it as a normal CURIE
+            return self.get_canonical_curies(curies=suffix)
+
+        results_dict = {}
+        # Iterate over all possible prefixes and construct full CURIEs
+        for prefix in ALL_PREFIXES:
+            full_curie = f"{prefix}:{suffix}"
+            curie_result = self.get_canonical_curies(curies=full_curie)
+            if curie_result.get(full_curie):
+                results_dict.update(curie_result)
+
+        return results_dict
 
     def get_canonical_curies(self, curies: Optional[Union[str, Set[str], List[str]]] = None,
                              names: Optional[Union[str, Set[str], List[str]]] = None,
