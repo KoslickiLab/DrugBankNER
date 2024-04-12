@@ -4,6 +4,13 @@ import sys
 import logging
 import xmltodict
 import re
+from CONSTANTS import DB_PREFIX
+from node_synonymizer import NodeSynonymizer
+
+
+# Directly use the node synonymizer
+synonymizer = NodeSynonymizer("./data", "node_synonymizer_v1.0_KG2.8.4.sqlite")
+
 
 def get_logger(level: str = logging.INFO):
     """
@@ -81,3 +88,49 @@ def process_drugbank_data(doc, fields):
             if any(drug_info.values()):
                 drug_dict[primary_id] = drug_info
     return drug_dict
+
+
+def delete_long_tokens(text, max_length=100):
+    """
+    This function deletes tokens that are longer than 100 characters
+    :param text: str
+    :return: str
+    """
+    tokens = text.split(" ")
+    return ' '.join([token for token in tokens if len(token) < max_length])
+
+
+def get_preferred_name(curie):
+    results = synonymizer.get_canonical_curies(curies=curie)
+    return results[curie]['preferred_name']
+
+
+def drug_dict_to_kg2_drug_info(drug_dict):
+    """
+    Take the output of process_drug_bank_data and create a dictionary keyed by KG2 notes, with values being the
+    different fields from DrugBank with their associated text
+    :param drug_dict:
+    :return:
+    """
+    kg2_drug_info = {}
+    # convert all the drugbank IDs to KG2 IDs
+    i = 0
+    max_i = len(drug_dict.keys())
+    for drug in drug_dict.keys():
+        if i % 100 == 0:
+            print(f"Processing drug {i} of {max_i}")
+        i += 1
+        query_CURIE = DB_PREFIX + drug
+        norm_results = synonymizer.get_canonical_curies(query_CURIE)
+        if norm_results[query_CURIE]:
+            identifier = norm_results[query_CURIE]['preferred_curie']
+            name = norm_results[query_CURIE]['preferred_name']
+            category = norm_results[query_CURIE]['preferred_category']
+            if identifier:
+                kg2_drug_info[identifier] = {}
+                kg2_drug_info[identifier]['KG2_ID'] = identifier
+                if name:
+                    kg2_drug_info[identifier]['name'] = get_preferred_name(identifier)
+                if category:
+                    kg2_drug_info[identifier]['category'] = category
+                kg2_drug_info[identifier]["drug_bank_id"] = drug
