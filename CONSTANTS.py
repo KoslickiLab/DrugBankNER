@@ -19,8 +19,10 @@ ALL_FIELDS = ['description', 'indication', 'pharmacodynamics', 'mechanism-of-act
               'metabolism', 'protein-binding', 'pathways', 'reactions', 'targets',
               'enzymes', 'carriers', 'transporters']
 
+DESIRED_XML_FIELDS = ['description', 'indication', 'pharmacodynamics', 'mechanism-of-action']
+
 DATABASE_NAMES = ['DrugBank', 'CAS', 'KEGG Compound', 'KEGG Drug', 'PubChem Compound', 'PubChem Substance',
-                  'ChEBI', 'PharmGKB', 'HET', 'UniProt', 'GenBank', 'DPD', 'NDC', 'SMPDB']
+                  'ChEBI', 'PharmGKB', 'HET', 'UniProt', 'GenBank', 'DPD', 'NDC', 'SMPDB', 'PR']
 
 DATABASE_PREFIXES = {
     'DrugBank': 'DRUGBANK',
@@ -31,13 +33,15 @@ DATABASE_PREFIXES = {
     'PubChem Substance': 'PUBCHEM.SUBSTANCE',
     'ChEBI': 'CHEBI',
     'PharmGKB': 'PHARMGKB',
-    'HET': 'HET',  # Check if this is correct as it wasn't listed explicitly
-    'UniProt': 'UNIPROT',
+    'HET': '',
+    'UniProt': 'UNIPROTKB',
     'GenBank': 'GENBANK',
-    'DPD': 'DPD',  # Check if this is correct as it wasn't listed explicitly
+    'DPD': '',
     'NDC': 'NDC',
-    'SMPDB': 'SMPDB'
+    'SMPDB': 'SMPDB',
+    'PR': 'PR'
 }
+
 REGEX_PATTERNS = {
     'DrugBank': r'DB\d+',
     'CAS': r'\d{2,7}-\d{2}-\d',
@@ -52,7 +56,8 @@ REGEX_PATTERNS = {
     'GenBank': r'\w{2}\d{6}',
     'DPD': r'\d+',
     'NDC': r'\d{4}-\d{4}-\d{2}',
-    'SMPDB': r'SMP\d+'
+    'SMPDB': r'SMP\d+',
+    'PR': r'P:\d+'
 }
 
 # Got the following from:
