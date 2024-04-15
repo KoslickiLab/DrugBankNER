@@ -12,8 +12,7 @@ MECHANISTIC_CATEGORIES = {"biolink:BiologicalProcess", "biolink:BiologicalProces
 "biolink:SmallMolecule", "biolink:Transcript"}
 
 MOSTLY_TEXT_FIELDS = ['description', 'indication', 'pharmacodynamics', 'mechanism-of-action',
-              'metabolism', 'protein-binding', 'reactions',
-              'enzymes', 'carriers', 'transporters']
+              'metabolism', 'protein-binding']
 
 ALL_FIELDS = ['description', 'indication', 'pharmacodynamics', 'mechanism-of-action',
               'metabolism', 'protein-binding', 'pathways', 'reactions', 'targets',

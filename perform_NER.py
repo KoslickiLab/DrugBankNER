@@ -2,14 +2,10 @@ import NER
 import json
 import spacy
 import pickle
-from utils import get_xml_data, process_drugbank_data, delete_long_tokens, drug_dict_to_kg2_drug_info
+from utils import get_xml_data, delete_long_tokens, process_drug_bank_xmldict_data, remove_brackets
 from CONSTANTS import MECHANISTIC_CATEGORIES, MOSTLY_TEXT_FIELDS
 
-# TODO: note! The pathways are all associated with identifiers, so probably only need to align them with KG2,
-#  no need to perform NER on them. Same with targets and transporters
-
 spacy.require_gpu()
-
 
 # Chunyu's NER; different models have different strengths and weaknesses. Through trial and error, I decided on these
 # five, since each results in matches the other models don't get.
@@ -63,9 +59,9 @@ def text_to_kg2_mechanistic_nodes(text):
     return potential_mechanistic_matched_nodes
 
 
-def drug_bank_id_to_kg2_indication(drug_bank_id, drug_dict):
-    indication = drug_dict[drug_bank_id]['indication']
-    res = trapi_ner.get_kg2_match(indication, remove_mark=True)
+def text_indication_to_kg2_nodes(indication_text):
+    indication_text = delete_long_tokens(indication_text)
+    res = trapi_ner.get_kg2_match(indication_text, remove_mark=True)
     # For each entry in res, return the key and preferred_name of those entries where the preferred_category is
     # biolink:Disease, phenotypicFeature, or DiseaseOrPhenotypicFeature
     potential_indications_id_to_name = {}
@@ -86,12 +82,9 @@ def main():
     # After running download_data.sh, the data will be in the data/ directory
     # convert the xml to dicts
     doc = get_xml_data()
-    drug_dict = process_drugbank_data(doc, MOSTLY_TEXT_FIELDS)
+    kg2_drug_info = process_drug_bank_xmldict_data(doc)
 
-    print("Number of drugs with info:", len(drug_dict))
-
-    # Let's start the dictionary that will be keyed by the KG2 drug identifiers and will have the drug info as values
-    kg2_drug_info = drug_dict_to_kg2_drug_info(drug_dict)
+    print("Number of drugs with info:", len(kg2_drug_info))
 
     # So now we have the KG2 identifiers for the drugs, as well as the category, name, and drugbank id
     # Now, I would like to NER the indications to add to an "indication" field in the kg2_drug_info dictionary.
@@ -104,12 +97,14 @@ def main():
         i += 1
         drug_bank_id = kg2_drug_info[kg2_drug]["drug_bank_id"]
         # NER and KG2 align the indications
-        kg2_drug_info[kg2_drug]["indications"] = drug_bank_id_to_kg2_indication(drug_bank_id, drug_dict)
-        # NER and KG2 align the mechanistic intermediate nodes
+        kg2_drug_info[kg2_drug]["indication_NER_aligned"] = text_indication_to_kg2_nodes(
+            remove_brackets(kg2_drug_info[kg2_drug]["indication"]))
+        # NER and KG2 align the mechanistic intermediate nodes from the text fields
         all_intermediate_text = ""
-        for field in drug_dict[drug_bank_id].keys():
-            if field != "indication":
-                all_intermediate_text += drug_dict[drug_bank_id][field]
+        for field in MOSTLY_TEXT_FIELDS:
+            text = kg2_drug_info[kg2_drug].get(field)
+            if text:
+                all_intermediate_text += remove_brackets(text) + "\n "
         # then do the NER
         kg2_drug_info[kg2_drug]["mechanistic_intermediate_nodes"] = text_to_kg2_mechanistic_nodes(all_intermediate_text)
 

@@ -32,73 +32,6 @@ def get_xml_data():
     return doc
 
 
-def extract_text(value):
-    """
-    TODO: depreciate this
-    Traverses a nested dictionary/list-of*-lists and extracts all the text values
-    :param value:
-    :return: big-ol-string
-    """
-    if isinstance(value, list):
-        res = ' '.join(extract_text(v) for v in value)
-    elif isinstance(value, dict):
-        res = ' '.join(extract_text(v) for k, v in value.items() if not k.startswith('@'))
-    else:
-        res = str(value)
-    if res != 'None':
-        return res
-    else:
-        return ''
-
-
-def process_drug(drug, fields):
-    """
-    TODO: depreciate this
-    Processes a drug from the drugbank xml file, extracting text from the fields we are interested in
-    :param drug: xmltodict drug object
-    :param fields: list of strings
-    :return: dictionary
-    """
-    #fields = ['description', 'indication', 'pharmacodynamics', 'mechanism-of-action',
-    #          'metabolism', 'protein-binding', 'pathways', 'reactions', 'targets',
-    #          'enzymes', 'carriers', 'transporters']  # From what I can see, these are the most relevant to us
-    #fields = ['description', 'indication', 'pharmacodynamics', 'mechanism-of-action',
-    #          'metabolism', 'protein-binding', 'reactions',
-    #          'enzymes', 'carriers', 'transporters']
-    drug_data = {}
-    for field in fields:
-        value = drug.get(field, '')
-        text = extract_text(value)
-        # remove anything within brackets from the text (these are all references in the drugbank data)
-        text = re.sub(r'\[.*?\]', '', text)
-        drug_data[field] = text
-    return drug_data
-
-
-def process_drugbank_data(doc, fields):
-    """
-    TODO: depreciate this
-    :param doc:
-    :param fields:
-    :return:
-    """
-    drugs = doc['drugbank']['drug']
-    drug_dict = {}
-    for drug in drugs:
-        # This handles the case where there are multiple drugbank-ids and chooses the primary one
-        drug_ids = drug['drugbank-id']
-        try:
-            primary_id = [d['#text'] for d in drug_ids if isinstance(d, dict) and d.get('@primary', '') == 'true'][0]
-        except IndexError:
-            primary_id = drug_ids['#text'] if isinstance(drug_ids, dict) and drug_ids.get('@primary', '') == 'true' else ''
-        if primary_id:
-            drug_info = process_drug(drug, fields)
-            # check if some field is not empty
-            if any(drug_info.values()):
-                drug_dict[primary_id] = drug_info
-    return drug_dict
-
-
 def delete_long_tokens(text, max_length=100):
     """
     This function deletes tokens that are longer than 100 characters
@@ -114,39 +47,82 @@ def get_preferred_name(curie):
     return results[curie]['preferred_name']
 
 
-def drug_dict_to_kg2_drug_info(drug_dict):
+def remove_brackets(text):
     """
-    TODO: depreciate this
-    Take the output of process_drug_bank_data and create a dictionary keyed by KG2 notes, with values being the
-    different fields from DrugBank with their associated text
-    :param drug_dict:
-    :return:
+    This function removes brackets and their contents from the text
+    :param text: str
+    :return: str
     """
-    kg2_drug_info = {}
-    # convert all the drugbank IDs to KG2 IDs
-    i = 0
-    max_i = len(drug_dict.keys())
-    for drug in drug_dict.keys():
-        if i % 100 == 0:
-            print(f"Processing drug {i} of {max_i}")
-        i += 1
-        query_CURIE = DB_PREFIX + drug
-        norm_results = synonymizer.get_canonical_curies(query_CURIE)
-        if norm_results[query_CURIE]:
-            identifier = norm_results[query_CURIE]['preferred_curie']
-            name = norm_results[query_CURIE]['preferred_name']
-            category = norm_results[query_CURIE]['preferred_category']
-            if identifier:
-                kg2_drug_info[identifier] = {}
-                kg2_drug_info[identifier]['KG2_ID'] = identifier
-                if name:
-                    kg2_drug_info[identifier]['name'] = get_preferred_name(identifier)
-                if category:
-                    kg2_drug_info[identifier]['category'] = category
-                kg2_drug_info[identifier]["drug_bank_id"] = drug
-    return kg2_drug_info
+    return re.sub(r'\[.*?\]', '', text)
 
 
+def process_drug_bank_xmldict_data(doc):
+    """
+    This function processes the drugbank xml data and extracts the relevant information
+    :param doc: doc = get_xml_data()
+    :return: dict
+    """
+    extracted_data = dict()
+    for entry in doc['drugbank']['drug']:
+        drug_dict = process_drugbank_doc_entry(entry)
+        if drug_dict:
+            extracted_data.update(drug_dict)
+    return extracted_data
+
+
+def process_drugbank_doc_entry(entry):
+    """
+    This function processes a drugbank entry and extracts the relevant information
+    :param entry: dict
+    :return: dict
+    """
+    drugbank_drug_id = None
+    if isinstance(entry.get('drugbank-id'), dict):
+        drugbank_drug_id = entry.get('drugbank-id').get('#text')
+    elif isinstance(entry.get('drugbank-id'), list):
+        drugbank_drug_id = entry.get('drugbank-id')[0]['#text']
+    if drugbank_drug_id:
+        kg2_drug_info = drug_bank_id_to_kg2_info(drugbank_drug_id)
+    else:
+        return None
+    if kg2_drug_info:
+        kg2_id = list(kg2_drug_info.keys())[0]
+        if kg2_id:
+            description_text = entry.get('description')
+            indication_text = entry.get('indication')
+            pharmacodynamics_text = entry.get('pharmacodynamics')
+            mechanism_of_action_text = entry.get('mechanism-of-action')
+            metabolism_text = entry.get('metabolism')
+            transporters_names, transporters_ids = crawl_drugbank_bioentities(entry, 'transporters')
+            enzymes_names, enzymes_ids = crawl_drugbank_bioentities(entry, 'enzymes')
+            targets_names, targets_ids = crawl_drugbank_bioentities(entry, 'targets')
+            carriers_names, carriers_ids = crawl_drugbank_bioentities(entry, 'carriers')
+            pathway_ids, pathway_enzymes = crawl_drugbank_pathway(entry)
+            # deduplicate all the *_names and *_ids lists
+            transporters_names = list(set(transporters_names))
+            transporters_ids = list(set(transporters_ids))
+            enzymes_names = list(set(enzymes_names))
+            enzymes_ids = list(set(enzymes_ids))
+            targets_names = list(set(targets_names))
+            targets_ids = list(set(targets_ids))
+            carriers_names = list(set(carriers_names))
+            carriers_ids = list(set(carriers_ids))
+            pathway_ids = list(set(pathway_ids))
+            kg2_drug_info[kg2_id]['description'] = description_text
+            kg2_drug_info[kg2_id]['indication'] = indication_text
+            kg2_drug_info[kg2_id]['pharmacodynamics'] = pharmacodynamics_text
+            kg2_drug_info[kg2_id]['mechanism_of_action'] = mechanism_of_action_text
+            kg2_drug_info[kg2_id]['metabolism'] = metabolism_text
+            kg2_drug_info[kg2_id]['transporters'] = {'names': transporters_names, 'ids': transporters_ids}
+            kg2_drug_info[kg2_id]['enzymes'] = {'names': enzymes_names, 'ids': enzymes_ids}
+            kg2_drug_info[kg2_id]['targets'] = {'names': targets_names, 'ids': targets_ids}
+            kg2_drug_info[kg2_id]['carriers'] = {'names': carriers_names, 'ids': carriers_ids}
+            kg2_drug_info[kg2_id]['pathways'] = {'ids': pathway_ids, 'enzymes': {'ids': pathway_enzymes}}
+            return kg2_drug_info
+        else:
+            return None
+    else:
+        return None
 
 
 def crawl_drugbank_bioentities(entry, field: Literal['transporters', 'enzymes', 'targets', 'carriers']):
@@ -224,7 +200,6 @@ def crawl_drugbank_pathway(entry):
     # Tack on the UniProtKB: prefix
     pathway_enzymes = ['UniProtKB:' + x for x in pathway_enzymes]
     return pathway_ids, pathway_enzymes
-
 
 
 def drug_bank_id_to_kg2_info(drug_bank_id):
