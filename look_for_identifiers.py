@@ -6,10 +6,9 @@ import pickle
 import pandas as pd
 from node_synonymizer import NodeSynonymizer
 import re
-from utils import extract_text, process_drug, get_xml_data, process_drugbank_data, drug_dict_to_kg2_drug_info, \
-    crawl_drugbank_bioentities, crawl_drugbank_pathway, drug_bank_id_to_kg2_info
+from utils import get_xml_data, process_drug_bank_xmldict_data
 from CONSTANTS import MECHANISTIC_CATEGORIES, DB_PREFIX, MOSTLY_TEXT_FIELDS, ALL_FIELDS, DATABASE_PREFIXES, \
-    DATABASE_NAMES, REGEX_PATTERNS
+    DATABASE_NAMES, REGEX_PATTERNS, IDENTIFIER_FIELDS
 from typing import Literal, Union, List, Dict, Any
 
 
@@ -24,52 +23,57 @@ def find_curies_with_prefix(text):
     for key, pattern in REGEX_PATTERNS.items():
         found = re.compile(pattern).findall(text)
         for f in found:
-            curie = DATABASE_PREFIXES[key] + ":" + f
+            curie = DATABASE_PREFIXES[key] + ":" + text  # the regex can get partial matches, so I'll add the prefix
+            # to the full input (not the matched portion)
             syn_result = synonymizer.get_canonical_curies(curie)
             if syn_result[curie]:
                 preferred_name = syn_result[curie]['preferred_name']
                 category = syn_result[curie]['preferred_category']
                 preferred_curie = syn_result[curie]['preferred_curie']
-                res.append({'curie': preferred_curie, 'preferred_name': preferred_name, 'preferred_category': category})
+                res.append({'preferred_curie': preferred_curie, 'preferred_name': preferred_name, 'preferred_category': category})
     return res
 
 synonymizer = NodeSynonymizer()
 
-doc = get_xml_data()
-entry = doc['drugbank']['drug'][0]
+# doc = get_xml_data()
+# kg2_drug_info = process_drug_bank_xmldict_data(doc)
+# Just read in the pkl file: ./data/kg2_drug_info.pkl
+with open('./data/kg2_drug_info.pkl', 'rb') as f:
+    kg2_drug_info = pickle.load(f)
 
-def process_drugbank_doc_entry(entry):
-    """
-    This function processes a drugbank entry and extracts the relevant information
-    :param entry: dict
-    :return: dict
-    """
-    drugbank_drug_id = entry.get('drugbank-id')[0]['#text']
-    kg2_drug_info = drug_bank_id_to_kg2_info(drugbank_drug_id)
-    kg2_id = list(kg2_drug_info.keys())[0]
-    if kg2_id:
-        description_text = entry.get('description')
-        indication_text = entry.get('indication')
-        pharmacodynamics_text = entry.get('pharmacodynamics')
-        mechanism_of_action_text = entry.get('mechanism-of-action')
-        metabolism_text = entry.get('metabolism')
-        transporters_names, transporters_ids = crawl_drugbank_bioentities(entry, 'transporters')
-        enzymes_names, enzymes_ids = crawl_drugbank_bioentities(entry, 'enzymes')
-        targets_names, targets_ids = crawl_drugbank_bioentities(entry, 'targets')
-        carriers_names, carriers_ids = crawl_drugbank_bioentities(entry, 'carriers')
-        pathway_ids, pathway_enzymes = crawl_drugbank_pathway(entry)
-        kg2_drug_info[kg2_id]['description'] = description_text
-        kg2_drug_info[kg2_id]['indication'] = indication_text
-        kg2_drug_info[kg2_id]['pharmacodynamics'] = pharmacodynamics_text
-        kg2_drug_info[kg2_id]['mechanism_of_action'] = mechanism_of_action_text
-        kg2_drug_info[kg2_id]['metabolism'] = metabolism_text
-        kg2_drug_info[kg2_id]['transporters'] = {'names': transporters_names, 'ids': transporters_ids}
-        kg2_drug_info[kg2_id]['enzymes'] = {'names': enzymes_names, 'ids': enzymes_ids}
-        kg2_drug_info[kg2_id]['targets'] = {'names': targets_names, 'ids': targets_ids}
-        kg2_drug_info[kg2_id]['carriers'] = {'names': carriers_names, 'ids': carriers_ids}
-        kg2_drug_info[kg2_id]['pathways'] = {'ids': pathway_ids, 'enzymes': {'ids': pathway_enzymes}}
-        return kg2_drug_info
-    else:
-        return None
+# Go through each drug, use the names to find KG2 nodes, and then use the identifiers to find the preferred curies
+# add each to the mechanistic_intermediate_nodes field
+for drug in kg2_drug_info.keys():
+    for field in IDENTIFIER_FIELDS:
+        names = []
+        if kg2_drug_info[drug].get(field):
+            names = kg2_drug_info[drug].get(field).get('names')
+        if names:
+            res = synonymizer.get_canonical_curies(names=names)
+            for key, value in res.items():
+                if value:
+                    preferred_name = value['preferred_name']
+                    preferred_curie = value['preferred_curie']
+                    preferred_category = value['preferred_category']
+                    if preferred_curie not in kg2_drug_info[drug]['mechanistic_intermediate_nodes']:
+                        kg2_drug_info[drug]['mechanistic_intermediate_nodes'].update({preferred_curie: {'name': preferred_name,
+                                                                                                         'category': preferred_category}})
+                        print(f"Added: {preferred_name}")
+        if kg2_drug_info[drug].get(field):
+            ids = kg2_drug_info[drug].get(field).get('ids')
+            if ids:
+                for id in ids:
+                    if ":" not in id:  # That means I'm dealing with a suffix
+                        results = find_curies_with_prefix(id)
+                        for res in results:
+                            preferred_name = res['preferred_name']
+                            preferred_curie = res['preferred_curie']
+                            preferred_category = res['preferred_category']
+                            if preferred_curie not in kg2_drug_info[drug]['mechanistic_intermediate_nodes']:
+                                kg2_drug_info[drug]['mechanistic_intermediate_nodes'].update({preferred_curie: {'name': preferred_name,
+                                                                                                                 'category': preferred_category}})
+                                print(f"Added: {preferred_name}")
 
-print(json.dumps(process_drugbank_doc_entry(entry), indent=4))
+print(len(kg2_drug_info[drug]['mechanistic_intermediate_nodes']))
+# Let's check to see what all the identifiers could look like. I am getting a bunch of off-target matches since the
+# suffix can match with multiple prefixes, leading to things like "Q8TCC7" mapping to SLC22A8 (correct) and (+)-8-Hydroxycalamenene

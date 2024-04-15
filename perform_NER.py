@@ -31,7 +31,7 @@ trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_syn
                           num_neighbors=15, max_entities_per_mention=1)
 
 
-def text_to_kg2_mechanistic_nodes(text):
+def text_to_kg2_nodes(text, categories=None):
     potential_mechanistic_matched_nodes = {}
     # split the text into sentences
     sentences = text.split('.')
@@ -49,7 +49,16 @@ def text_to_kg2_mechanistic_nodes(text):
                 continue
             for key, value in res.items():  # keys are plain text names, values are lists of tuples
                 for v in value:  # v[0] is the KG2 identifier, v[1] is the node info in the form of a dict
-                    if v[1]['preferred_category'] in MECHANISTIC_CATEGORIES:
+                    if categories:
+                        if v[1]['preferred_category'] in categories:
+                            if v[0] not in potential_mechanistic_matched_nodes:
+                                potential_mechanistic_matched_nodes[v[0]] = {'name': key,
+                                                                             'category': v[1]['preferred_category']}
+                            # replace name with longer name
+                            elif v[0] in potential_mechanistic_matched_nodes and len(key) > len(
+                                    potential_mechanistic_matched_nodes[v[0]]['name']):
+                                potential_mechanistic_matched_nodes[v[0]]['name'] = key
+                    else:
                         if v[0] not in potential_mechanistic_matched_nodes:
                             potential_mechanistic_matched_nodes[v[0]] = {'name': key, 'category': v[1]['preferred_category']}
                         # replace name with longer name
@@ -57,25 +66,6 @@ def text_to_kg2_mechanistic_nodes(text):
                                 potential_mechanistic_matched_nodes[v[0]]['name']):
                             potential_mechanistic_matched_nodes[v[0]]['name'] = key
     return potential_mechanistic_matched_nodes
-
-
-def text_indication_to_kg2_nodes(indication_text):
-    indication_text = delete_long_tokens(indication_text)
-    res = trapi_ner.get_kg2_match(indication_text, remove_mark=True)
-    # For each entry in res, return the key and preferred_name of those entries where the preferred_category is
-    # biolink:Disease, phenotypicFeature, or DiseaseOrPhenotypicFeature
-    potential_indications_id_to_name = {}
-    for key, value in res.items():
-        for v in value:
-            if v[1]['preferred_category'] in {'biolink:Disease', 'biolink:PhenotypicFeature',
-                                              'biolink:DiseaseOrPhenotypicFeature'}:
-                if v[0] not in potential_indications_id_to_name:
-                    potential_indications_id_to_name[v[0]] = key
-                # replace name with longer name
-                elif v[0] in potential_indications_id_to_name and len(key) > len(
-                        potential_indications_id_to_name[v[0]]):
-                    potential_indications_id_to_name[v[0]] = key
-    return potential_indications_id_to_name
 
 
 def main():
@@ -95,10 +85,14 @@ def main():
         #if i % 100 == 0:
         print(f"Processing drug {i} of {max_i}")
         i += 1
-        drug_bank_id = kg2_drug_info[kg2_drug]["drug_bank_id"]
         # NER and KG2 align the indications
-        kg2_drug_info[kg2_drug]["indication_NER_aligned"] = text_indication_to_kg2_nodes(
-            remove_brackets(kg2_drug_info[kg2_drug]["indication"]))
+        if kg2_drug_info[kg2_drug].get("indication"):
+            kg2_drug_info[kg2_drug]["indication_NER_aligned"] = text_to_kg2_nodes(
+                remove_brackets(kg2_drug_info[kg2_drug]["indication"]), categories=['biolink:Disease',
+                                                                                    'biolink:PhenotypicFeature',
+                                                                                    'biolink:DiseaseOrPhenotypicFeature'])
+        else:
+            kg2_drug_info[kg2_drug]["indication_NER_aligned"] = {}
         # NER and KG2 align the mechanistic intermediate nodes from the text fields
         all_intermediate_text = ""
         for field in MOSTLY_TEXT_FIELDS:
@@ -106,7 +100,8 @@ def main():
             if text:
                 all_intermediate_text += remove_brackets(text) + "\n "
         # then do the NER
-        kg2_drug_info[kg2_drug]["mechanistic_intermediate_nodes"] = text_to_kg2_mechanistic_nodes(all_intermediate_text)
+        kg2_drug_info[kg2_drug]["mechanistic_intermediate_nodes"] = text_to_kg2_nodes(all_intermediate_text,
+                                                                                      categories=MECHANISTIC_CATEGORIES)
 
     # Now, let's write this to a JSON file
     with open('./data/kg2_drug_info.json', 'w') as f:

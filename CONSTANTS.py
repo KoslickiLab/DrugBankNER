@@ -18,6 +18,8 @@ ALL_FIELDS = ['description', 'indication', 'pharmacodynamics', 'mechanism-of-act
               'metabolism', 'protein-binding', 'pathways', 'reactions', 'targets',
               'enzymes', 'carriers', 'transporters']
 
+IDENTIFIER_FIELDS = ['pathways', 'reactions', 'targets', 'enzymes', 'carriers', 'transporters']
+
 DESIRED_XML_FIELDS = ['description', 'indication', 'pharmacodynamics', 'mechanism-of-action']
 
 DATABASE_NAMES = ['DrugBank', 'CAS', 'KEGG Compound', 'KEGG Drug', 'PubChem Compound', 'PubChem Substance',
