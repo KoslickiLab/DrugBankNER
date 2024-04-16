@@ -43,8 +43,12 @@ with open('./data/kg2_drug_info.pkl', 'rb') as f:
 
 # Go through each drug, use the names to find KG2 nodes, and then use the identifiers to find the preferred curies
 # add each to the mechanistic_intermediate_nodes field
+i = 0
 for drug in kg2_drug_info.keys():
+    print(f"Processing drug {i} of {len(kg2_drug_info.keys())}")
+    i += 1
     for field in IDENTIFIER_FIELDS:
+        # Align the names to KG2
         names = []
         if kg2_drug_info[drug].get(field):
             names = kg2_drug_info[drug].get(field).get('names')
@@ -58,7 +62,8 @@ for drug in kg2_drug_info.keys():
                     if preferred_curie not in kg2_drug_info[drug]['mechanistic_intermediate_nodes']:
                         kg2_drug_info[drug]['mechanistic_intermediate_nodes'].update({preferred_curie: {'name': preferred_name,
                                                                                                          'category': preferred_category}})
-                        print(f"Added: {preferred_name}")
+        # Align the IDs to KG2
+        ids = []
         if kg2_drug_info[drug].get(field):
             ids = kg2_drug_info[drug].get(field).get('ids')
             if ids:
@@ -72,8 +77,10 @@ for drug in kg2_drug_info.keys():
                             if preferred_curie not in kg2_drug_info[drug]['mechanistic_intermediate_nodes']:
                                 kg2_drug_info[drug]['mechanistic_intermediate_nodes'].update({preferred_curie: {'name': preferred_name,
                                                                                                                  'category': preferred_category}})
-                                print(f"Added: {preferred_name}")
 
-print(len(kg2_drug_info[drug]['mechanistic_intermediate_nodes']))
-# Let's check to see what all the identifiers could look like. I am getting a bunch of off-target matches since the
-# suffix can match with multiple prefixes, leading to things like "Q8TCC7" mapping to SLC22A8 (correct) and (+)-8-Hydroxycalamenene
+# Now, let's write this to a JSON file
+with open('./data/DrugBank_aligned_with_KG2.json', 'w') as f:
+    json.dump(kg2_drug_info, f, indent=2)
+# Also dump to a pickle file
+with open('./data/DrugBank_aligned_with_KG2.pkl', 'wb') as f:
+    pickle.dump(kg2_drug_info, f)
