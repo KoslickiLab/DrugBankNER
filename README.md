@@ -19,3 +19,8 @@ Please download the `en_core_sci_lg` model from [here](https://allenai.github.io
 ```bash
 pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_lg-0.5.3.tar.gz
 ```
+
+# Running the tool
+
+1. Run `perform_NER.py` to perform named entity recognition and alignment on the text fields of DrugBank
+2. Next, run `look_for_identifiers.py` to extract, synonymize, and align identifiers in DrugBank to RTX-KG2
