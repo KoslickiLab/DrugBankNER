@@ -24,3 +24,5 @@ pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/e
 
 1. Run `perform_NER.py` to perform named entity recognition and alignment on the text fields of DrugBank
 2. Next, run `look_for_identifiers.py` to extract, synonymize, and align identifiers in DrugBank to RTX-KG2
+
+The resulting NER and aligned results will then be in `./data/DrugBank_aligned_with_KG2.json`
