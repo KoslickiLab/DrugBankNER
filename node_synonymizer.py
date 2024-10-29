@@ -15,7 +15,7 @@ import pandas as pd
 
 class NodeSynonymizer:
 
-    def __init__(self, synonymizer_dir: str = "./data", synonymizer_dbname: str = "node_synonymizer_v1.0_KG2.8.4.sqlite"):
+    def __init__(self, synonymizer_dir: str = "./data", synonymizer_dbname: str = "node_synonymizer_v1.0_KG2.10.1.sqlite"):
         self.database_name = synonymizer_dbname
         synonymizer_dir = os.path.abspath(synonymizer_dir)
         self.database_path = f"{synonymizer_dir}/{self.database_name}"

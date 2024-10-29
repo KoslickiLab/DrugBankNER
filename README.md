@@ -14,11 +14,29 @@ ETL of DrugBank to recognize KG2 concepts in DrugBank entries for use as trainin
     ```
     Note that this path is via [this line in config_dbs.json](https://github.
     com/RTXteam/RTX/blob/master/code/config_dbs.json#L3C28-L3C111) in case it gets updated
-1. Download ScispaCy training data
-Please download the `en_core_sci_lg` model from [here](https://allenai.github.io/scispacy/). In short, this can be accomplished with
-```bash
-pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_lg-0.5.3.tar.gz
-```
+1. Set up the environment and install required packages:
+    ```bash
+    conda create --name drug_bank_NER python==3.11.10
+    conda activate drug_bank_NER
+    pip install xmltodict==0.14.2
+    pip install pandas==2.2.3
+    pip install spacy==3.8.2
+    pip install scispacy==0.5.5
+    ```
+    Find your CUDA version by running:
+    ```bash
+    nvidia-smi
+    ```
+    Then, install the corresponding `cupy-cuda` package:
+    ```bash
+    pip install cupy-cuda<your_cuda_version>x
+    ```
+
+    Finally, download and install the ScispaCy models:
+    ```bash
+    pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_lg-0.5.3.tar.gz
+    pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_scibert-0.5.3.tar.gz
+    ```
 
 # Running the tool
 

@@ -10,7 +10,7 @@ from typing import Literal
 
 
 # Directly use the node synonymizer
-synonymizer = NodeSynonymizer("./data", "node_synonymizer_v1.0_KG2.8.4.sqlite")
+synonymizer = NodeSynonymizer("./data", "node_synonymizer_v1.0_KG2.10.1.sqlite")
 
 
 def get_logger(level: str = logging.INFO):

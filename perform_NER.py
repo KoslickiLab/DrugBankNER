@@ -10,23 +10,23 @@ spacy.require_gpu()
 # Chunyu's NER; different models have different strengths and weaknesses. Through trial and error, I decided on these
 # five, since each results in matches the other models don't get.
 ners = []
-trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_synonymizer_v1.0_KG2.8.4.sqlite',
+trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_synonymizer_v1.0_KG2.10.1.sqlite',
                     linker_name=['umls', 'mesh'], spacy_model='en_core_sci_lg', threshold=0.70,
                               num_neighbors=15, max_entities_per_mention=1)
 ners.append(trapi_ner)
-trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_synonymizer_v1.0_KG2.8.4.sqlite',
+trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_synonymizer_v1.0_KG2.10.1.sqlite',
                               linker_name=['umls', 'mesh'], spacy_model='en_core_sci_scibert', threshold=0.75,
                               num_neighbors=10, max_entities_per_mention=1)
 ners.append(trapi_ner)
-trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_synonymizer_v1.0_KG2.8.4.sqlite',
+trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_synonymizer_v1.0_KG2.10.1.sqlite',
                           linker_name=['rxnorm'], spacy_model='en_core_sci_lg', threshold=0.70,
                           num_neighbors=15, max_entities_per_mention=1)
 ners.append(trapi_ner)
-trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_synonymizer_v1.0_KG2.8.4.sqlite',
+trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_synonymizer_v1.0_KG2.10.1.sqlite',
                           linker_name=['go'], spacy_model='en_core_sci_lg', threshold=0.70,
                           num_neighbors=15, max_entities_per_mention=1)
 ners.append(trapi_ner)
-trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_synonymizer_v1.0_KG2.8.4.sqlite',
+trapi_ner = NER.TRAPI_NER(synonymizer_dir='./data', synonymizer_dbname='node_synonymizer_v1.0_KG2.10.1.sqlite',
                           linker_name=['hpo'], spacy_model='en_core_sci_lg', threshold=0.70,
                           num_neighbors=15, max_entities_per_mention=1)
 
