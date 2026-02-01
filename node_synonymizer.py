@@ -12,10 +12,12 @@ from CONSTANTS import ALL_PREFIXES
 
 import pandas as pd
 
+from parser import get_kg_version
+
 
 class NodeSynonymizer:
 
-    def __init__(self, synonymizer_dir: str = "./data", synonymizer_dbname: str = "node_synonymizer_v1.0_KG2.10.1.sqlite"):
+    def __init__(self, synonymizer_dir: str, synonymizer_dbname: str):
         self.database_name = synonymizer_dbname
         synonymizer_dir = os.path.abspath(synonymizer_dir)
         self.database_path = f"{synonymizer_dir}/{self.database_name}"
@@ -444,7 +446,10 @@ def main():
     arg_parser.add_argument("-g", "--graph", dest="graph", action="store_true")
     args = arg_parser.parse_args()
 
-    synonymizer = NodeSynonymizer()
+    kg_version = get_kg_version()
+    synonymizer_dbname = f'node_synonymizer_v1.0_KG{kg_version}.sqlite'
+
+    synonymizer = NodeSynonymizer("./data", synonymizer_dbname)
     if args.canonical:
         results = synonymizer.get_canonical_curies(curies=args.curie_or_name)
         if not results[args.curie_or_name]:
