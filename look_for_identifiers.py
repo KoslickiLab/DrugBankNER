@@ -13,6 +13,7 @@ from node_synonymizer import NodeSynonymizer
 import re
 
 from CONSTANTS import DATABASE_PREFIXES, REGEX_PATTERNS, IDENTIFIER_FIELDS
+from parser import get_parser
 
 
 def find_curies_with_prefix(text):
@@ -36,140 +37,27 @@ def find_curies_with_prefix(text):
                 res.append({'preferred_curie': preferred_curie, 'preferred_name': preferred_name, 'preferred_category': category})
     return res
 
-
-def kg_version_validator(value: str) -> str:
-    if not re.fullmatch(r"\d+\.\d+\.\d+", value):
-        raise argparse.ArgumentTypeError("KG version must look like X.Y.Z (e.g. 2.10.2)")
-    return value
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Builds curie_ngd sqlite database for a given KG version."
-    )
-
-    parser.add_argument(
-        "--kg-version",
-        type=kg_version_validator,
-        required=True,
-        metavar="VERSION",
-        help="Knowledge graph version (e.g. 2.10.2)",
-    )
-
-    parser.add_argument(
-        "--plover-url",
-        type=str,
-        required=True,
-        help="PloverDB URL",
-    )
-
-    parser.add_argument(
-        "--db-host",
-        default="arax-databases.rtx.ai",
-        type=str,
-        help="Database file host (default: arax-databases.rtx.ai)",
-    )
-
-    parser.add_argument(
-        "--db-username",
-        default="rtxconfig",
-        type=str,
-        help="Database file username (default: rtxconfig)",
-    )
-
-    parser.add_argument(
-        "--db-port",
-        default=22,
-        type=int,
-        help="Database file port (default: 22)",
-    )
-
-    parser.add_argument(
-        "--ssh-key",
-        default=None,
-        help="Path to SSH private key (optional). If omitted, uses SSH agent/default keys.",
-    )
-
-    parser.add_argument(
-        "--ssh-password",
-        default=None,
-        help="SSH password (optional; prefer key/agent). You can also set SSH_PASSWORD env var.",
-    )
-
-    parser.add_argument(
-        "--redis-host",
-        default="localhost",
-        type=str,
-        help="Redis host (default: localhost)",
-    )
-
-    parser.add_argument(
-        "--redis-port",
-        default=6379,
-        type=int,
-        help="Redis port (default: 6379)",
-    )
-
-    parser.add_argument(
-        "--redis-db",
-        default=0,
-        type=int,
-        help="Redis database index (default: 0)",
-    )
-
-    parser.add_argument(
-        "--num-pubmed-articles",
-        default=3.5e7,
-        type=float,
-        help="Number of PubMed citations and abstracts (default: 3.5e7)",
-    )
-
-    parser.add_argument(
-        "--avg-mesh-terms-per-article",
-        default=20,
-        type=int,
-        help="Average number of MeSH terms per article (default: 20)",
-    )
-
-    # Optional: choose output dir for downloads
-    parser.add_argument(
-        "--out-dir",
-        default="./data",
-        type=str,
-        help="Where to store downloaded DB files (default: current directory)",
-    )
-
-    return parser.parse_args()
-
-
 if __name__ == "__main__":
-    args = parse_args()
+    args = get_parser().parse_args()
 
     kg_version = args.kg_version
-    db_host = args.db_host
-    db_username = args.db_username
-    db_port = args.db_port
-    ssh_key = args.ssh_key
-    ssh_password = args.ssh_password or os.getenv("SSH_PASSWORD")
     synonymizer_dbname = f'node_synonymizer_v1.0_KG{kg_version}.sqlite'
-
     out_dir_str = args.out_dir
     out_dir = Path(out_dir_str)
     remote_path_synonymizer_db = f"~/KG{kg_version}/{synonymizer_dbname}"
-
     local_path_synonymizer_db = out_dir / synonymizer_dbname
 
     ensure_downloaded_and_verified(
-        host=db_host,
-        username=db_username,
-        port=db_port,
+        host=args.db_host,
+        username=args.db_username,
+        port=args.db_port,
         remote_path=remote_path_synonymizer_db,
         local_path=local_path_synonymizer_db,
-        key_path=ssh_key,
-        password=ssh_password,
+        key_path=args.ssh_key,
+        password=args.ssh_password or os.getenv("SSH_PASSWORD"),
     )
 
-    synonymizer = NodeSynonymizer("./data", synonymizer_dbname)
+    synonymizer = NodeSynonymizer(out_dir_str, synonymizer_dbname)
 
     # doc = get_xml_data()
     # kg2_drug_info = process_drug_bank_xmldict_data(doc)
