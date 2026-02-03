@@ -18,5 +18,4 @@ rm -f data/"$DATABASE_XML_UNZIPPED"
 cd data || exit
 curl -Lfv -o "$DATABASE_XML" -u dmk333@psu.edu:"$PASSWORD" "https://go.drugbank.com/releases/5-1-12/downloads/all-full-database"
 unzip "$DATABASE_XML"
-mv full\ database.xml full_database.xml
 cd ..

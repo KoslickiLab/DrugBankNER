@@ -23,7 +23,7 @@ def get_logger(level: str = logging.INFO):
 
 
 def get_xml_data(out_dir_str):
-    with open(f'{out_dir_str}/full_database.xml', 'r', encoding='utf-8') as fd:
+    with open(f'{out_dir_str}/full database.xml', 'r', encoding='utf-8') as fd:
         doc = xmltodict.parse(fd.read())
     return doc
 
