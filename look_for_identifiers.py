@@ -60,7 +60,7 @@ if __name__ == "__main__":
     synonymizer = NodeSynonymizer(out_dir_str, synonymizer_dbname)
 
     # doc = get_xml_data()
-    # kg2_drug_info = process_drug_bank_xmldict_data(doc)
+    # kg2_drug_info = process_drug_bank_xmldict_data(doc, out_dir_str, synonymizer_dbname)
     # Just read in the pkl file: ./data/kg2_drug_info.pkl
     with open(f'{out_dir_str}/kg2_drug_info.pkl', 'rb') as f:
         kg2_drug_info = pickle.load(f)

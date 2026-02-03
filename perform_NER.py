@@ -101,7 +101,7 @@ def main():
     # After running download_data.sh, the data will be in the data/ directory
     # convert the xml to dicts
     doc = get_xml_data(out_dir_str)
-    kg2_drug_info = process_drug_bank_xmldict_data(doc, synonymizer_dbname)
+    kg2_drug_info = process_drug_bank_xmldict_data(doc, out_dir_str, synonymizer_dbname)
 
     print("Number of drugs with info:", len(kg2_drug_info))
 
