@@ -1,46 +1,143 @@
 # DrugBankNER
-ETL of DrugBank to recognize KG2 concepts in DrugBank entries for use as training data
 
-# Prep work
-1. Download DrugBank XML file from DrugBank.ca
-    1. Make an account on DrugBank
-    1. Run `./download_data.sh`, which will put the DrugBank XML file in the `data` directory
-1. You will need to have a copy of the RTX/ARAX node synonymizer
-    1. Easiest way is to ask a team member for a copy
-    2. Otherwise, you will need to still ask a team member to add your RSA key to the database server
-    5. After that, you can get the sqlite file via
-    ```
-    scp rtxconfig@arax.databases.rtx.ai:/translator/data/orangeboard/databases/KG2.8.4/node_synonymizer_v1.0_KG2.8.4.sqlite .
-    ```
-    Note that this path is via [this line in config_dbs.json](https://github.
-    com/RTXteam/RTX/blob/master/code/config_dbs.json#L3C28-L3C111) in case it gets updated
-1. Set up the environment and install required packages:
-    ```bash
-    conda create --name drug_bank_NER python==3.11.10
-    conda activate drug_bank_NER
-    pip install xmltodict==0.14.2
-    pip install pandas==2.2.3
-    pip install spacy==3.8.2
-    pip install scispacy==0.5.5
-    ```
-    Find your CUDA version by running:
-    ```bash
-    nvidia-smi
-    ```
-    Then, install the corresponding `cupy-cuda` package:
-    ```bash
-    pip install cupy-cuda<your_cuda_version>x
-    ```
+ETL pipeline for processing DrugBank data and aligning entities and identifiers with RTX-KG2 concepts.
+The resulting output is intended for use as training or evaluation data in downstream knowledge graph tasks.
 
-    Finally, download and install the ScispaCy models:
-    ```bash
-    pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_lg-0.5.3.tar.gz
-    pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_scibert-0.5.3.tar.gz
-    ```
+---
 
-# Running the tool
+## Prep Work
 
-1. Run `perform_NER.py` to perform named entity recognition and alignment on the text fields of DrugBank
-2. Next, run `look_for_identifiers.py` to extract, synonymize, and align identifiers in DrugBank to RTX-KG2
+### 1. Download DrugBank XML
 
-The resulting NER and aligned results will then be in `./data/DrugBank_aligned_with_KG2.json`
+1. Create an account at https://go.drugbank.com
+2. Run:
+   ```bash
+   ./download_data.sh
+   ```
+   This will place the DrugBank XML file in the `data/` directory.
+
+---
+
+### 2. Obtain the RTX / ARAX Node Synonymizer
+
+You will need a compatible node synonymizer SQLite database for the KG version you are using.
+
+- **Recommended**: Ask a team member for a local copy of the node synonymizer database  
+  (this is useful if you do not have access to the RTX database server).
+
+- **Alternative**: Request access to the RTX database server (`arax-databases.rtx.ai`).  
+  If access is granted, the scripts will automatically download the appropriate node synonymizer database when it is not found locally.
+
+> ⚠️ The node synonymizer version must match the KG version passed via `--kg-version`.  
+> The scripts first check for a local database and only attempt a download if it is not already available.
+
+---
+
+### 3. Environment Setup
+
+Create and activate a conda environment:
+
+```bash
+conda create --name drugbank_ner python=3.11.10
+conda activate drugbank_ner
+```
+
+Install required packages:
+
+```bash
+pip install xmltodict==0.14.2
+pip install pandas==2.2.3
+pip install spacy==3.8.2
+pip install scispacy==0.5.5
+```
+
+#### Optional: GPU support
+
+Check your CUDA version:
+
+```bash
+nvidia-smi
+```
+
+Then install the matching CuPy package:
+
+```bash
+pip install cupy-cuda<your_cuda_version>x
+```
+
+---
+
+### 4. Install ScispaCy Models
+
+```bash
+pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_lg-0.5.3.tar.gz
+pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_scibert-0.5.3.tar.gz
+```
+
+---
+
+## Running the Tool
+
+> **Important**  
+> As of the latest refactor, all scripts require the `--kg-version` argument.  
+> This ensures that downloaded databases and alignment logic are consistent with the intended knowledge graph version.
+
+---
+
+### 1. Perform Named Entity Recognition
+
+Run `perform_NER.py` to perform named entity recognition and concept alignment on DrugBank text fields.
+
+```bash
+python perform_NER.py --kg-version 2.10.2
+```
+
+#### Optional arguments
+
+```text
+--db-host        Database file host (default: arax-databases.rtx.ai)
+--db-username    Database file username (default: rtxconfig)
+--db-port        Database file port (default: 22)
+--ssh-key        Path to SSH private key (optional; uses SSH agent if omitted)
+--ssh-password   SSH password (optional; prefer key or agent; can also set SSH_PASSWORD env var)
+--out-dir        Output directory for downloaded database files (default: ./data)
+```
+
+Example:
+
+```bash
+python perform_NER.py \
+  --kg-version 2.10.2 \
+  --out-dir ./data \
+  --ssh-key ~/.ssh/id_rsa
+```
+
+---
+
+### 2. Extract and Align Identifiers
+
+Run `look_for_identifiers.py` to extract, synonymize, and align DrugBank identifiers with RTX-KG2.
+
+```bash
+python look_for_identifiers.py --kg-version 2.10.2
+```
+
+This script supports the same optional connection and output arguments as `perform_NER.py`.
+
+---
+
+## Output
+
+After successfully running both scripts, the final aligned output will be written to:
+
+```text
+./data/DrugBank_aligned_with_KG2.json
+```
+
+---
+
+## Notes
+
+- The `--kg-version` argument must follow the format `X.Y.Z` (e.g. `2.10.2`)
+- Ensure all downloaded database artifacts correspond to the specified KG version
+- SSH key–based authentication is strongly recommended over password-based access

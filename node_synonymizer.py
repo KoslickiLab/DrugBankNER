@@ -12,10 +12,13 @@ from CONSTANTS import ALL_PREFIXES
 
 import pandas as pd
 
+from download_script import ensure_downloaded_and_verified
+from parser import get_parser
+
 
 class NodeSynonymizer:
 
-    def __init__(self, synonymizer_dir: str = "./data", synonymizer_dbname: str = "node_synonymizer_v1.0_KG2.10.1.sqlite"):
+    def __init__(self, synonymizer_dir: str, synonymizer_dbname: str):
         self.database_name = synonymizer_dbname
         synonymizer_dir = os.path.abspath(synonymizer_dir)
         self.database_path = f"{synonymizer_dir}/{self.database_name}"
@@ -433,7 +436,7 @@ class NodeSynonymizer:
 
 
 def main():
-    arg_parser = argparse.ArgumentParser()
+    arg_parser = get_parser()
     arg_parser.add_argument("curie_or_name")
     # Add flags corresponding to each of the three main synonymizer methods
     arg_parser.add_argument("-c", "--canonical", dest="canonical", action="store_true")
@@ -444,7 +447,24 @@ def main():
     arg_parser.add_argument("-g", "--graph", dest="graph", action="store_true")
     args = arg_parser.parse_args()
 
-    synonymizer = NodeSynonymizer()
+    kg_version = args.kg_version
+    synonymizer_dbname = f'node_synonymizer_v1.0_KG{kg_version}.sqlite'
+    out_dir_str = args.out_dir
+    out_dir = pathlib.Path(out_dir_str)
+    remote_path_synonymizer_db = f"~/KG{kg_version}/{synonymizer_dbname}"
+    local_path_synonymizer_db = out_dir / synonymizer_dbname
+
+    ensure_downloaded_and_verified(
+        host=args.db_host,
+        username=args.db_username,
+        port=args.db_port,
+        remote_path=remote_path_synonymizer_db,
+        local_path=local_path_synonymizer_db,
+        key_path=args.ssh_key,
+        password=args.ssh_password or os.getenv("SSH_PASSWORD"),
+    )
+
+    synonymizer = NodeSynonymizer(out_dir_str, synonymizer_dbname)
     if args.canonical:
         results = synonymizer.get_canonical_curies(curies=args.curie_or_name)
         if not results[args.curie_or_name]:
