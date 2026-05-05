@@ -8,8 +8,7 @@ import json
 import spacy
 import pickle
 
-from download_script import ensure_downloaded_and_verified
-from parser import get_parser
+
 from utils import get_xml_data, delete_long_tokens, process_drug_bank_xmldict_data, remove_brackets
 from CONSTANTS import MECHANISTIC_CATEGORIES, MOSTLY_TEXT_FIELDS
 
@@ -55,53 +54,30 @@ def text_to_kg2_nodes(ners, text, categories=None):
 
 
 def main():
-    args = get_parser().parse_args()
-
-    kg_version = args.kg_version
-    synonymizer_dbname = f'node_synonymizer_v1.0_KG{kg_version}.sqlite'
-    out_dir_str = args.out_dir
-    out_dir = Path(out_dir_str)
-    remote_path_synonymizer_db = f"~/KG{kg_version}/{synonymizer_dbname}"
-    local_path_synonymizer_db = out_dir / synonymizer_dbname
-
-    ensure_downloaded_and_verified(
-        host=args.db_host,
-        username=args.db_username,
-        port=args.db_port,
-        remote_path=remote_path_synonymizer_db,
-        local_path=local_path_synonymizer_db,
-        key_path=args.ssh_key,
-        password=args.ssh_password or os.getenv("SSH_PASSWORD"),
-    )
 
     # Chunyu's NER; different models have different strengths and weaknesses. Through trial and error, I decided on these
     # five, since each results in matches the other models don't get.
     ners = []
-    trapi_ner = NER.TRAPI_NER(synonymizer_dir=out_dir_str, synonymizer_dbname=synonymizer_dbname,
-                              linker_name=['umls', 'mesh'], spacy_model='en_core_sci_lg', threshold=0.70,
+    trapi_ner = NER.TRAPI_NER(linker_name=['umls', 'mesh'], spacy_model='en_core_sci_lg', threshold=0.70,
                               num_neighbors=15, max_entities_per_mention=1)
     ners.append(trapi_ner)
-    trapi_ner = NER.TRAPI_NER(synonymizer_dir=out_dir_str, synonymizer_dbname=synonymizer_dbname,
-                              linker_name=['umls', 'mesh'], spacy_model='en_core_sci_scibert', threshold=0.75,
+    trapi_ner = NER.TRAPI_NER(linker_name=['umls', 'mesh'], spacy_model='en_core_sci_scibert', threshold=0.75,
                               num_neighbors=10, max_entities_per_mention=1)
     ners.append(trapi_ner)
-    trapi_ner = NER.TRAPI_NER(synonymizer_dir=out_dir_str, synonymizer_dbname=synonymizer_dbname,
-                              linker_name=['rxnorm'], spacy_model='en_core_sci_lg', threshold=0.70,
+    trapi_ner = NER.TRAPI_NER(linker_name=['rxnorm'], spacy_model='en_core_sci_lg', threshold=0.70,
                               num_neighbors=15, max_entities_per_mention=1)
     ners.append(trapi_ner)
-    trapi_ner = NER.TRAPI_NER(synonymizer_dir=out_dir_str, synonymizer_dbname=synonymizer_dbname,
-                              linker_name=['go'], spacy_model='en_core_sci_lg', threshold=0.70,
+    trapi_ner = NER.TRAPI_NER(linker_name=['go'], spacy_model='en_core_sci_lg', threshold=0.70,
                               num_neighbors=15, max_entities_per_mention=1)
     ners.append(trapi_ner)
-    trapi_ner = NER.TRAPI_NER(synonymizer_dir=out_dir_str, synonymizer_dbname=synonymizer_dbname,
-                              linker_name=['hpo'], spacy_model='en_core_sci_lg', threshold=0.70,
+    trapi_ner = NER.TRAPI_NER(linker_name=['hpo'], spacy_model='en_core_sci_lg', threshold=0.70,
                               num_neighbors=15, max_entities_per_mention=1)
     ners.append(trapi_ner)
 
     # After running download_data.sh, the data will be in the data/ directory
     # convert the xml to dicts
-    doc = get_xml_data(out_dir_str)
-    kg2_drug_info = process_drug_bank_xmldict_data(doc, out_dir_str, synonymizer_dbname)
+    doc = get_xml_data("data/")
+    kg2_drug_info = process_drug_bank_xmldict_data(doc)
 
     print("Number of drugs with info:", len(kg2_drug_info))
 

@@ -12,7 +12,7 @@ import json
 
 class TRAPI_NER:
 
-    def __init__(self, synonymizer_dir: str, synonymizer_dbname: str,
+    def __init__(self,
                  spacy_model: str = 'en_core_sci_lg',
                  linker_name: Union[str, List] = 'umls',
                  threshold: float = 0.99,
@@ -22,9 +22,6 @@ class TRAPI_NER:
         self.logger = get_logger()
 
         # Import Node Synonymizer
-        sys.path.append(synonymizer_dir)
-        from node_synonymizer import NodeSynonymizer
-        self.synonymizer = NodeSynonymizer(synonymizer_dir, synonymizer_dbname)
 
         # Check if the input linker_name is valid
         if type(linker_name) not in [str, list]:

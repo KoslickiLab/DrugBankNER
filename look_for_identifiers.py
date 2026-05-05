@@ -8,12 +8,10 @@ import xmltodict
 import json
 import pickle
 
-from download_script import ensure_downloaded_and_verified
 from node_synonymizer import NodeSynonymizer
 import re
 
 from CONSTANTS import DATABASE_PREFIXES, REGEX_PATTERNS, IDENTIFIER_FIELDS
-from parser import get_parser
 
 
 def find_curies_with_prefix(text):
@@ -38,31 +36,13 @@ def find_curies_with_prefix(text):
     return res
 
 if __name__ == "__main__":
-    args = get_parser().parse_args()
 
-    kg_version = args.kg_version
-    synonymizer_dbname = f'node_synonymizer_v1.0_KG{kg_version}.sqlite'
-    out_dir_str = args.out_dir
-    out_dir = Path(out_dir_str)
-    remote_path_synonymizer_db = f"~/KG{kg_version}/{synonymizer_dbname}"
-    local_path_synonymizer_db = out_dir / synonymizer_dbname
-
-    ensure_downloaded_and_verified(
-        host=args.db_host,
-        username=args.db_username,
-        port=args.db_port,
-        remote_path=remote_path_synonymizer_db,
-        local_path=local_path_synonymizer_db,
-        key_path=args.ssh_key,
-        password=args.ssh_password or os.getenv("SSH_PASSWORD"),
-    )
-
-    synonymizer = NodeSynonymizer(out_dir_str, synonymizer_dbname)
+    synonymizer = NodeSynonymizer()
 
     # doc = get_xml_data()
     # kg2_drug_info = process_drug_bank_xmldict_data(doc, out_dir_str, synonymizer_dbname)
     # Just read in the pkl file: ./data/kg2_drug_info.pkl
-    with open(f'{out_dir_str}/kg2_drug_info.pkl', 'rb') as f:
+    with open(f'data/kg2_drug_info.pkl', 'rb') as f:
         kg2_drug_info = pickle.load(f)
 
     # Go through each drug, use the names to find KG2 nodes, and then use the identifiers to find the preferred curies
@@ -105,8 +85,8 @@ if __name__ == "__main__":
                                                            'category': preferred_category}})
 
     # Now, let's write this to a JSON file
-    with open(f'{out_dir_str}/DrugBank_aligned_with_KG2.json', 'w') as f:
+    with open(f'data/DrugBank_aligned_with_KG2.json', 'w') as f:
         json.dump(kg2_drug_info, f, indent=2)
     # Also dump to a pickle file
-    with open(f'{out_dir_str}/DrugBank_aligned_with_KG2.pkl', 'wb') as f:
+    with open(f'data/DrugBank_aligned_with_KG2.pkl', 'wb') as f:
         pickle.dump(kg2_drug_info, f)
