@@ -76,7 +76,7 @@ def main():
 
     # After running download_data.sh, the data will be in the data/ directory
     # convert the xml to dicts
-    doc = get_xml_data("data/")
+    doc = get_xml_data("data")
     kg2_drug_info = process_drug_bank_xmldict_data(doc)
 
     print("Number of drugs with info:", len(kg2_drug_info))
