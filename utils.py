@@ -5,7 +5,7 @@ import logging
 import xmltodict
 import re
 from CONSTANTS import DB_PREFIX
-from node_synonymizer import NodeSynonymizer
+
 from typing import Literal
 
 
@@ -38,8 +38,7 @@ def delete_long_tokens(text, max_length=100):
     return ' '.join([token for token in tokens if len(token) < max_length])
 
 
-def get_preferred_name(curie):
-    synonymizer = NodeSynonymizer()
+def get_preferred_name(curie, synonymizer):
     results = synonymizer.get_canonical_curies(curies=curie)
     return results[curie]['preferred_name']
 
@@ -53,7 +52,7 @@ def remove_brackets(text):
     return re.sub(r'\[.*?\]', '', text)
 
 
-def process_drug_bank_xmldict_data(doc):
+def process_drug_bank_xmldict_data(doc, synonymizer):
     """
     This function processes the drugbank xml data and extracts the relevant information
     :param doc: doc = get_xml_data()
@@ -63,13 +62,13 @@ def process_drug_bank_xmldict_data(doc):
     """
     extracted_data = dict()
     for entry in doc['drugbank']['drug']:
-        drug_dict = process_drugbank_doc_entry(entry)
+        drug_dict = process_drugbank_doc_entry(entry, synonymizer)
         if drug_dict:
             extracted_data.update(drug_dict)
     return extracted_data
 
 
-def process_drugbank_doc_entry(entry):
+def process_drugbank_doc_entry(entry, synonymizer):
     """
     This function processes a drugbank entry and extracts the relevant information
     :param entry: dict
@@ -83,7 +82,7 @@ def process_drugbank_doc_entry(entry):
     elif isinstance(entry.get('drugbank-id'), list):
         drugbank_drug_id = entry.get('drugbank-id')[0]['#text']
     if drugbank_drug_id:
-        kg2_drug_info = drug_bank_id_to_kg2_info(drugbank_drug_id)
+        kg2_drug_info = drug_bank_id_to_kg2_info(drugbank_drug_id, synonymizer)
     else:
         return None
     if kg2_drug_info:
@@ -203,10 +202,9 @@ def crawl_drugbank_pathway(entry):
     return pathway_ids, pathway_enzymes
 
 
-def drug_bank_id_to_kg2_info(drug_bank_id):
+def drug_bank_id_to_kg2_info(drug_bank_id, synonymizer):
     kg2_drug_info = {}
     query_CURIE = DB_PREFIX + drug_bank_id
-    synonymizer = NodeSynonymizer()
     norm_results = synonymizer.get_canonical_curies(query_CURIE)
     if norm_results[query_CURIE]:
         identifier = norm_results[query_CURIE]['preferred_curie']
@@ -216,7 +214,7 @@ def drug_bank_id_to_kg2_info(drug_bank_id):
             kg2_drug_info[identifier] = {}
             kg2_drug_info[identifier]['KG2_ID'] = identifier
             if name:
-                kg2_drug_info[identifier]['name'] = get_preferred_name(identifier)
+                kg2_drug_info[identifier]['name'] = get_preferred_name(identifier, synonymizer)
             if category:
                 kg2_drug_info[identifier]['category'] = category
             kg2_drug_info[identifier]["drug_bank_id"] = drug_bank_id

@@ -11,7 +11,7 @@ import pickle
 
 from utils import get_xml_data, delete_long_tokens, process_drug_bank_xmldict_data, remove_brackets
 from CONSTANTS import MECHANISTIC_CATEGORIES, MOSTLY_TEXT_FIELDS
-
+from node_synonymizer import NodeSynonymizer
 spacy.require_gpu()
 
 
@@ -54,6 +54,11 @@ def text_to_kg2_nodes(ners, text, categories=None):
 
 
 def main():
+    synonymizer = NodeSynonymizer()
+    doc = get_xml_data("data")
+    kg2_drug_info = process_drug_bank_xmldict_data(doc, synonymizer)
+
+    print("Number of drugs with info:", len(kg2_drug_info))
 
     # Chunyu's NER; different models have different strengths and weaknesses. Through trial and error, I decided on these
     # five, since each results in matches the other models don't get.
@@ -76,10 +81,7 @@ def main():
 
     # After running download_data.sh, the data will be in the data/ directory
     # convert the xml to dicts
-    doc = get_xml_data("data")
-    kg2_drug_info = process_drug_bank_xmldict_data(doc)
 
-    print("Number of drugs with info:", len(kg2_drug_info))
 
     # So now we have the KG2 identifiers for the drugs, as well as the category, name, and drugbank id
     # Now, I would like to NER the indications to add to an "indication" field in the kg2_drug_info dictionary.
