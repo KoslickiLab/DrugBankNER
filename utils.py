@@ -40,6 +40,8 @@ def delete_long_tokens(text, max_length=100):
 
 def get_preferred_name(curie, synonymizer):
     results = synonymizer.get_canonical_curies(curies=curie)
+    if results is None or curie not in results or 'preferred_name' not in results[curie]:
+        return ""
     return results[curie]['preferred_name']
 
 
