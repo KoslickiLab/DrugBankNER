@@ -13,6 +13,7 @@ import json
 class TRAPI_NER:
 
     def __init__(self,
+                 synonymizer,
                  spacy_model: str = 'en_core_sci_lg',
                  linker_name: Union[str, List] = 'umls',
                  threshold: float = 0.99,
@@ -20,6 +21,7 @@ class TRAPI_NER:
                  max_entities_per_mention: int = 1):
         # Setup logger
         self.logger = get_logger()
+        self.synonymizer = synonymizer
 
         # Import Node Synonymizer
 
