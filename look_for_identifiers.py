@@ -12,6 +12,7 @@ from node_synonymizer import NodeSynonymizer
 import re
 
 from CONSTANTS import DATABASE_PREFIXES, REGEX_PATTERNS, IDENTIFIER_FIELDS
+from CachedNodeSynonymizer import CachedNodeSynonymizer
 
 
 def find_curies_with_prefix(text):
@@ -37,7 +38,8 @@ def find_curies_with_prefix(text):
 
 if __name__ == "__main__":
 
-    synonymizer = NodeSynonymizer()
+    base_syn = NodeSynonymizer()
+    synonymizer = CachedNodeSynonymizer(base_syn)
 
     # doc = get_xml_data()
     # kg2_drug_info = process_drug_bank_xmldict_data(doc, out_dir_str, synonymizer_dbname)
@@ -90,3 +92,5 @@ if __name__ == "__main__":
     # Also dump to a pickle file
     with open(f'data/DrugBank_aligned_with_KG2.pkl', 'wb') as f:
         pickle.dump(kg2_drug_info, f)
+
+    synonymizer.save_cache()

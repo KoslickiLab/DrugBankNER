@@ -12,6 +12,7 @@ import pickle
 from utils import get_xml_data, delete_long_tokens, process_drug_bank_xmldict_data, remove_brackets
 from CONSTANTS import MECHANISTIC_CATEGORIES, MOSTLY_TEXT_FIELDS
 from node_synonymizer import NodeSynonymizer
+from CachedNodeSynonymizer import CachedNodeSynonymizer
 spacy.require_gpu()
 
 
@@ -54,7 +55,8 @@ def text_to_kg2_nodes(ners, text, categories=None):
 
 
 def main():
-    synonymizer = NodeSynonymizer()
+    base_syn = NodeSynonymizer()
+    synonymizer = CachedNodeSynonymizer(base_syn)
     doc = get_xml_data("data")
     kg2_drug_info = process_drug_bank_xmldict_data(doc, synonymizer)
 
