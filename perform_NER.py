@@ -114,11 +114,11 @@ def main():
                                                                                       categories=MECHANISTIC_CATEGORIES)
 
     # Now, let's write this to a JSON file
-    with open(f'{out_dir_str}/kg2_drug_info.json', 'w') as f:
+    with open(f'data/kg2_drug_info.json', 'w') as f:
         json.dump(kg2_drug_info, f, indent=4)
 
     # also save as a pickle file for fast loading
-    with open(f'{out_dir_str}/kg2_drug_info.pkl', 'wb') as f:
+    with open(f'data/kg2_drug_info.pkl', 'wb') as f:
         pickle.dump(kg2_drug_info, f)
 
 
